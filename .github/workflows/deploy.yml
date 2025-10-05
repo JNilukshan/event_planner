@@ -79,16 +79,16 @@ jobs:
               
               server_name _;
               
+              # Document root
+              root /home/azureuser/event_planner;
+              index index.html index.htm;
+              
               # Security headers
               add_header X-Frame-Options "SAMEORIGIN" always;
               add_header X-Content-Type-Options "nosniff" always;
               add_header X-XSS-Protection "1; mode=block" always;
               
-              # Serve static files directly
-              root /home/azureuser/event_planner;
-              index index.html;
-              
-              # Handle React Router (SPA)
+              # Handle React Router (SPA) - try files first, then fallback to index.html
               location / {
                   try_files $uri $uri/ /index.html;
               }
@@ -106,14 +106,33 @@ jobs:
                   return 200 "Event Planner - healthy\n";
                   add_header Content-Type text/plain;
               }
+              
+              # Error pages
+              error_page 404 /index.html;
           }
           EOF
+          
+          # Set proper permissions for nginx to read files
+          sudo chown -R www-data:www-data /home/azureuser/event_planner
+          sudo chmod -R 755 /home/azureuser/event_planner
           
           # Enable the site and restart nginx
           sudo rm -f /etc/nginx/sites-enabled/event-planner
           sudo ln -sf /etc/nginx/sites-available/event-planner /etc/nginx/sites-enabled/
-          sudo nginx -t && sudo systemctl reload nginx
-          sudo systemctl enable nginx
+          
+          # Test nginx configuration
+          echo "Testing nginx configuration..."
+          sudo nginx -t
+          
+          if [ $? -eq 0 ]; then
+              echo "Nginx config is valid, reloading..."
+              sudo systemctl reload nginx
+              sudo systemctl enable nginx
+          else
+              echo "Nginx config error, checking logs..."
+              sudo nginx -t
+              exit 1
+          fi
           
           # We don't need PM2 serve anymore, nginx serves static files directly
           pm2 stop event-planner 2>/dev/null || true
@@ -123,8 +142,14 @@ jobs:
           echo "📁 Files in directory:"
           ls -la /home/azureuser/event_planner/
           echo ""
+          echo "📁 File permissions:"
+          ls -la /home/azureuser/event_planner/index.html 2>/dev/null || echo "index.html not found"
+          echo ""
           echo "🌐 Access your Event Planner app:"
           echo "   Event Planner: http://$(curl -s ifconfig.me):3000"
           echo ""
-          echo "🔧 Nginx configuration:"
-          sudo nginx -t
+          echo "🔧 Nginx status:"
+          sudo systemctl status nginx --no-pager -l
+          echo ""
+          echo "🔧 Nginx error log (last 10 lines):"
+          sudo tail -10 /var/log/nginx/error.log
