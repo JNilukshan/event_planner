@@ -33,9 +33,13 @@ jobs:
           # Stop nginx to avoid conflicts during deployment
           sudo systemctl stop nginx 2>/dev/null || true
           
-          # Remove old files and create directory
-          sudo rm -rf /home/azureuser/event_planner/*
+          # Remove old files and create directory with proper permissions
+          sudo rm -rf /home/azureuser/event_planner
           mkdir -p /home/azureuser/event_planner
+          
+          # Set proper ownership and permissions for the directory
+          sudo chown -R azureuser:azureuser /home/azureuser/event_planner
+          chmod -R 755 /home/azureuser/event_planner
           
           # Install nginx if not exists
           if ! command -v nginx &> /dev/null; then
@@ -63,10 +67,14 @@ jobs:
           echo "📁 Files copied:"
           ls -la /home/azureuser/event_planner/
           
-          # Fix permissions for nginx
+          # Ensure proper ownership first (files should be owned by azureuser after copy)
+          sudo chown -R azureuser:azureuser /home/azureuser/event_planner
+          chmod -R 755 /home/azureuser/event_planner
+          
+          # Now change ownership to www-data for nginx to read
           sudo chown -R www-data:www-data /home/azureuser/event_planner
           sudo chmod -R 755 /home/azureuser/event_planner
-          sudo chmod 644 /home/azureuser/event_planner/* 2>/dev/null || true
+          sudo find /home/azureuser/event_planner -type f -exec chmod 644 {} \;
           
           # Create simple nginx configuration
           sudo tee /etc/nginx/sites-available/event-planner > /dev/null << 'EOF'
@@ -113,13 +121,16 @@ jobs:
               echo "✅ Event Planner deployed successfully!"
               echo "🌐 Access at: http://$(curl -s ifconfig.me):3000"
               echo ""
-              echo "� Files deployed:"
+              echo "📋 Files deployed:"
               ls -la /home/azureuser/event_planner/
+              echo ""
+              echo "📋 File permissions check:"
+              ls -la /home/azureuser/event_planner/index.html 2>/dev/null || echo "index.html not found"
               
           else
               echo "❌ Nginx configuration error:"
               sudo nginx -t
               echo "Error logs:"
-              sudo tail -10 /var/log/nginx/error.log
+              sudo tail -10 /var/log/nginx/error.log 2>/dev/null || echo "No error logs yet"
               exit 1
           fi
