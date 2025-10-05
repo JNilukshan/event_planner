@@ -29,7 +29,7 @@ jobs:
         host: ${{ secrets.VM_HOST }}
         username: ${{ secrets.VM_USERNAME }}
         password: ${{ secrets.VM_PASSWORD }}
-        source: "frontend/dist/*"
+        source: "dist/*"
         target: "/home/azureuser/event_planner/"
         strip_components: 1
 
