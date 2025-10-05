@@ -68,6 +68,8 @@ jobs:
         script: |
           sudo chown -R www-data:www-data /home/azureuser/event_planner
           sudo chmod -R 755 /home/azureuser/event_planner
+          # 👇 Allow Nginx to traverse into /home/azureuser
+          sudo chmod +x /home/azureuser
 
     - name: Configure Nginx and restart
       uses: appleboy/ssh-action@v1.0.0
