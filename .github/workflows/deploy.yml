@@ -68,16 +68,14 @@ jobs:
           # Check if files copied correctly
           ls -la /home/azureuser/event_planner/
           
-          # Start the app serving the current directory
-          cd /home/azureuser/event_planner
-          pm2 start serve --name event-planner -- -s . -l 3000 --single
-          pm2 save
+          # Set proper permissions
+          chmod -R 755 /home/azureuser/event_planner/
           
-          # Configure Nginx as reverse proxy
+          # Configure Nginx for Event Planner on port 3000
           sudo tee /etc/nginx/sites-available/event-planner > /dev/null << 'EOF'
           server {
-              listen 80 default_server;
-              listen [::]:80 default_server;
+              listen 3000;
+              listen [::]:3000;
               
               server_name _;
               
@@ -86,37 +84,17 @@ jobs:
               add_header X-Content-Type-Options "nosniff" always;
               add_header X-XSS-Protection "1; mode=block" always;
               
-              # Main React app
-              location / {
-                  proxy_pass http://localhost:3000;
-                  proxy_http_version 1.1;
-                  proxy_set_header Upgrade $http_upgrade;
-                  proxy_set_header Connection 'upgrade';
-                  proxy_set_header Host $host;
-                  proxy_set_header X-Real-IP $remote_addr;
-                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                  proxy_set_header X-Forwarded-Proto $scheme;
-                  proxy_cache_bypass $http_upgrade;
-                  
-                  # Handle React Router (SPA)
-                  try_files $uri $uri/ @fallback;
-              }
+              # Serve static files directly
+              root /home/azureuser/event_planner;
+              index index.html;
               
-              location @fallback {
-                  proxy_pass http://localhost:3000;
-                  proxy_http_version 1.1;
-                  proxy_set_header Upgrade $http_upgrade;
-                  proxy_set_header Connection 'upgrade';
-                  proxy_set_header Host $host;
-                  proxy_set_header X-Real-IP $remote_addr;
-                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                  proxy_set_header X-Forwarded-Proto $scheme;
-                  proxy_cache_bypass $http_upgrade;
+              # Handle React Router (SPA)
+              location / {
+                  try_files $uri $uri/ /index.html;
               }
               
               # Static assets with caching
               location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
-                  proxy_pass http://localhost:3000;
                   expires 1y;
                   add_header Cache-Control "public, immutable";
                   access_log off;
@@ -125,26 +103,28 @@ jobs:
               # Health check
               location /health {
                   access_log off;
-                  return 200 "healthy\n";
+                  return 200 "Event Planner - healthy\n";
                   add_header Content-Type text/plain;
               }
           }
           EOF
           
           # Enable the site and restart nginx
-          sudo rm -f /etc/nginx/sites-enabled/default
+          sudo rm -f /etc/nginx/sites-enabled/event-planner
           sudo ln -sf /etc/nginx/sites-available/event-planner /etc/nginx/sites-enabled/
           sudo nginx -t && sudo systemctl reload nginx
           sudo systemctl enable nginx
           
-          echo "✅ App deployed successfully!"
+          # We don't need PM2 serve anymore, nginx serves static files directly
+          pm2 stop event-planner 2>/dev/null || true
+          pm2 delete event-planner 2>/dev/null || true
+          
+          echo "✅ Event Planner deployed successfully!"
           echo "📁 Files in directory:"
           ls -la /home/azureuser/event_planner/
           echo ""
-          echo "🌐 Access your app:"
-          echo "   HTTP:  http://$(curl -s ifconfig.me)"
-          echo "   Direct: http://$(curl -s ifconfig.me):3000"
+          echo "🌐 Access your Event Planner app:"
+          echo "   Event Planner: http://$(curl -s ifconfig.me):3000"
           echo ""
-          echo "🔧 Services status:"
-          pm2 list
-          sudo systemctl status nginx --no-pager -l
+          echo "🔧 Nginx configuration:"
+          sudo nginx -t
