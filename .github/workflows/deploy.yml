@@ -1,0 +1,60 @@
+name: Deploy to VM
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Install dependencies
+      run: npm install
+
+    - name: Build project
+      run: npm run build
+
+    - name: Copy project to VM
+      uses: appleboy/scp-action@v0.1.5
+      with:
+        host: ${{ secrets.VM_HOST }}
+        username: ${{ secrets.VM_USERNAME }}
+        password: ${{ secrets.VM_PASSWORD }}
+        source: "dist/*"
+        target: "/home/azureuser/event_planner/"
+
+    - name: Deploy on VM
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.VM_HOST }}
+        username: ${{ secrets.VM_USERNAME }}
+        password: ${{ secrets.VM_PASSWORD }}
+        script: |
+          # Create project folder
+          mkdir -p /home/azureuser/event_planner
+          
+          # Install serve if not exists
+          if ! command -v serve &> /dev/null; then
+            sudo npm install -g serve
+          fi
+          
+          # Stop any existing process
+          pm2 stop event-planner 2>/dev/null || true
+          pm2 delete event-planner 2>/dev/null || true
+          
+          # Start the app
+          cd /home/azureuser/event_planner
+          pm2 start serve --name event-planner -- -s . -l 3000
+          pm2 save
+          
+          echo "App deployed successfully!"
+          echo "Visit: http://$(curl -s ifconfig.me):3000"

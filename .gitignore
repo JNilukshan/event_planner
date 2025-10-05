@@ -1,4 +1,58 @@
+# ========================================
+# React + TypeScript (Vite) project
+# ========================================
 node_modules/
-.env
 dist/
 build/
+.vscode/
+.idea/
+.cache/
+coverage/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment variables
+.env
+.env.local
+.env.production
+.env.development
+
+# ========================================
+# Terraform (azure_infra folder)
+# ========================================
+azure_infra/.terraform/
+azure_infra/.terraform.lock.hcl
+azure_infra/*.tfstate
+azure_infra/*.tfstate.backup
+azure_infra/*.tfvars
+azure_infra/*.tfvars.json
+azure_infra/*.tfplan
+azure_infra/*.out
+azure_infra/crash.log
+azure_infra/crash.*.log
+
+# ========================================
+# OS / Editor junk
+# ========================================
+.DS_Store
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# ========================================
+# Temporary / backup files
+# ========================================
+*.tmp
+*.swp
+*.swo
+*.bak
+*.orig
+
+# ========================================
+# Azure / deployment specific
+# ========================================
+*.publishsettings
+*.azure*
