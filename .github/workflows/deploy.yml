@@ -23,30 +23,25 @@ jobs:
     - name: Build project
       run: npm run build
 
-    - name: Deploy on VM
+    - name: Prepare VM
       uses: appleboy/ssh-action@v1.0.0
       with:
         host: ${{ secrets.VM_HOST }}
         username: ${{ secrets.VM_USERNAME }}
         password: ${{ secrets.VM_PASSWORD }}
         script: |
-          # Remove old files
-          rm -rf /home/azureuser/event_planner/*
+          # Stop nginx to avoid conflicts during deployment
+          sudo systemctl stop nginx 2>/dev/null || true
+          
+          # Remove old files and create directory
+          sudo rm -rf /home/azureuser/event_planner/*
           mkdir -p /home/azureuser/event_planner
           
-          # Install required packages
-          if ! command -v serve &> /dev/null; then
-            sudo npm install -g serve
-          fi
-          
+          # Install nginx if not exists
           if ! command -v nginx &> /dev/null; then
             sudo apt update
             sudo apt install -y nginx
           fi
-          
-          # Stop any existing process
-          pm2 stop event-planner 2>/dev/null || true
-          pm2 delete event-planner 2>/dev/null || true
 
     - name: Copy build files to VM
       uses: appleboy/scp-action@v0.1.5
@@ -58,98 +53,73 @@ jobs:
         target: "/home/azureuser/event_planner/"
         strip_components: 1
 
-    - name: Start application
+    - name: Configure and start application
       uses: appleboy/ssh-action@v1.0.0
       with:
         host: ${{ secrets.VM_HOST }}
         username: ${{ secrets.VM_USERNAME }}
         password: ${{ secrets.VM_PASSWORD }}
         script: |
-          # Check if files copied correctly
+          echo "📁 Files copied:"
           ls -la /home/azureuser/event_planner/
           
-          # Set proper permissions
-          chmod -R 755 /home/azureuser/event_planner/
+          # Fix permissions for nginx
+          sudo chown -R www-data:www-data /home/azureuser/event_planner
+          sudo chmod -R 755 /home/azureuser/event_planner
+          sudo chmod 644 /home/azureuser/event_planner/* 2>/dev/null || true
           
-          # Configure Nginx for Event Planner on port 3000
+          # Create simple nginx configuration
           sudo tee /etc/nginx/sites-available/event-planner > /dev/null << 'EOF'
           server {
               listen 3000;
-              listen [::]:3000;
-              
               server_name _;
               
-              # Document root
               root /home/azureuser/event_planner;
-              index index.html index.htm;
+              index index.html;
               
-              # Security headers
-              add_header X-Frame-Options "SAMEORIGIN" always;
-              add_header X-Content-Type-Options "nosniff" always;
-              add_header X-XSS-Protection "1; mode=block" always;
-              
-              # Handle React Router (SPA) - try files first, then fallback to index.html
               location / {
                   try_files $uri $uri/ /index.html;
               }
               
-              # Static assets with caching
-              location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
-                  expires 1y;
-                  add_header Cache-Control "public, immutable";
-                  access_log off;
-              }
-              
-              # Health check
               location /health {
-                  access_log off;
-                  return 200 "Event Planner - healthy\n";
+                  return 200 "Event Planner OK";
                   add_header Content-Type text/plain;
               }
               
-              # Error pages
-              error_page 404 /index.html;
+              error_log /var/log/nginx/event-planner-error.log;
+              access_log /var/log/nginx/event-planner-access.log;
           }
           EOF
           
-          # Set proper permissions for nginx to read files
-          sudo chown -R www-data:www-data /home/azureuser/event_planner
-          sudo chmod -R 755 /home/azureuser/event_planner
-          
-          # Enable the site and restart nginx
-          sudo rm -f /etc/nginx/sites-enabled/event-planner
+          # Enable site
+          sudo rm -f /etc/nginx/sites-enabled/event-planner*
           sudo ln -sf /etc/nginx/sites-available/event-planner /etc/nginx/sites-enabled/
           
-          # Test nginx configuration
-          echo "Testing nginx configuration..."
+          # Test and start nginx
+          echo "🧪 Testing nginx configuration..."
           sudo nginx -t
           
           if [ $? -eq 0 ]; then
-              echo "Nginx config is valid, reloading..."
-              sudo systemctl reload nginx
+              echo "✅ Starting nginx..."
+              sudo systemctl start nginx
               sudo systemctl enable nginx
+              
+              # Test the deployment
+              sleep 3
+              echo "🔍 Testing deployment..."
+              curl -I http://localhost:3000 || echo "Local test failed"
+              
+              echo ""
+              echo "✅ Event Planner deployed successfully!"
+              echo "🌐 Access at: http://$(curl -s ifconfig.me):3000"
+              echo ""
+              echo "� Files deployed:"
+              ls -la /home/azureuser/event_planner/
+              
           else
-              echo "Nginx config error, checking logs..."
+              echo "❌ Nginx configuration error:"
               sudo nginx -t
+              echo "Error logs:"
+              sudo tail -10 /var/log/nginx/error.log
               exit 1
           fi
-          
-          # We don't need PM2 serve anymore, nginx serves static files directly
-          pm2 stop event-planner 2>/dev/null || true
-          pm2 delete event-planner 2>/dev/null || true
-          
-          echo "✅ Event Planner deployed successfully!"
-          echo "📁 Files in directory:"
-          ls -la /home/azureuser/event_planner/
-          echo ""
-          echo "📁 File permissions:"
-          ls -la /home/azureuser/event_planner/index.html 2>/dev/null || echo "index.html not found"
-          echo ""
-          echo "🌐 Access your Event Planner app:"
-          echo "   Event Planner: http://$(curl -s ifconfig.me):3000"
-          echo ""
-          echo "🔧 Nginx status:"
-          sudo systemctl status nginx --no-pager -l
-          echo ""
-          echo "🔧 Nginx error log (last 10 lines):"
-          sudo tail -10 /var/log/nginx/error.log
