@@ -76,7 +76,7 @@ jobs:
               }
 
               location /assets/ {
-                  alias /home/azureuser/event_planner/assets/;
+                  root /home/azureuser/event_planner;
                   access_log off;
                   log_not_found off;
               }
@@ -99,4 +99,3 @@ jobs:
           # Confirm deployment
           echo "✅ Deployment complete! Check http://$(curl -s ifconfig.me):3000/"
 
-          
