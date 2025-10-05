@@ -1,7 +1,7 @@
 import React from 'react';
 import { Calendar, Users, QrCode, BarChart3, MapPin, FileText, CheckSquare, Upload, Mail, Shield } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
-
+////////////////////////////// About Component ////////////////////////////
 const About: React.FC = () => {
   const { isDark } = useTheme();
   
