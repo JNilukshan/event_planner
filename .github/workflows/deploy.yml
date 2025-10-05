@@ -23,15 +23,6 @@ jobs:
     - name: Build project
       run: npm run build
 
-    - name: Copy project to VM
-      uses: appleboy/scp-action@v0.1.5
-      with:
-        host: ${{ secrets.VM_HOST }}
-        username: ${{ secrets.VM_USERNAME }}
-        password: ${{ secrets.VM_PASSWORD }}
-        source: "dist/*"
-        target: "/home/azureuser/event_planner/"
-
     - name: Deploy on VM
       uses: appleboy/ssh-action@v1.0.0
       with:
@@ -39,7 +30,8 @@ jobs:
         username: ${{ secrets.VM_USERNAME }}
         password: ${{ secrets.VM_PASSWORD }}
         script: |
-          # Create project folder
+          # Remove old files
+          rm -rf /home/azureuser/event_planner/*
           mkdir -p /home/azureuser/event_planner
           
           # Install serve if not exists
@@ -50,11 +42,33 @@ jobs:
           # Stop any existing process
           pm2 stop event-planner 2>/dev/null || true
           pm2 delete event-planner 2>/dev/null || true
+
+    - name: Copy build files to VM
+      uses: appleboy/scp-action@v0.1.5
+      with:
+        host: ${{ secrets.VM_HOST }}
+        username: ${{ secrets.VM_USERNAME }}
+        password: ${{ secrets.VM_PASSWORD }}
+        source: "dist/*"
+        target: "/home/azureuser/event_planner/"
+        strip_components: 1
+
+    - name: Start application
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.VM_HOST }}
+        username: ${{ secrets.VM_USERNAME }}
+        password: ${{ secrets.VM_PASSWORD }}
+        script: |
+          # Check if files copied correctly
+          ls -la /home/azureuser/event_planner/
           
-          # Start the app
+          # Start the app serving the current directory
           cd /home/azureuser/event_planner
-          pm2 start serve --name event-planner -- -s . -l 3000
+          pm2 start serve --name event-planner -- -s . -l 3000 --single
           pm2 save
           
           echo "App deployed successfully!"
+          echo "Files in directory:"
+          ls -la /home/azureuser/event_planner/
           echo "Visit: http://$(curl -s ifconfig.me):3000"
