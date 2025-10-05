@@ -32,7 +32,7 @@ jobs:
         script: |
           sudo rm -rf /home/azureuser/event_planner
           sudo mkdir -p /home/azureuser/event_planner
-          sudo chown -R www-data:www-data /home/azureuser/event_planner
+          sudo chown -R $USER:$USER /home/azureuser/event_planner
           sudo chmod -R 755 /home/azureuser/event_planner
 
     - name: Copy build folder to VM
@@ -45,6 +45,16 @@ jobs:
         target: "/home/azureuser/event_planner/"
         strip_components: 1
 
+    - name: Set ownership for Nginx
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.VM_HOST }}
+        username: ${{ secrets.VM_USERNAME }}
+        password: ${{ secrets.VM_PASSWORD }}
+        script: |
+          sudo chown -R www-data:www-data /home/azureuser/event_planner
+          sudo chmod -R 755 /home/azureuser/event_planner
+
     - name: Configure Nginx and restart
       uses: appleboy/ssh-action@v1.0.0
       with:
@@ -52,10 +62,6 @@ jobs:
         username: ${{ secrets.VM_USERNAME }}
         password: ${{ secrets.VM_PASSWORD }}
         script: |
-          # Ensure proper ownership
-          sudo chown -R www-data:www-data /home/azureuser/event_planner
-          sudo chmod -R 755 /home/azureuser/event_planner
-
           # Create Nginx config
           sudo tee /etc/nginx/sites-available/event-planner > /dev/null << 'EOF'
           server {
@@ -92,3 +98,5 @@ jobs:
 
           # Confirm deployment
           echo "✅ Deployment complete! Check http://$(curl -s ifconfig.me):3000/"
+
+          
