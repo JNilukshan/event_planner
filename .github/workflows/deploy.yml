@@ -30,8 +30,9 @@ jobs:
         username: ${{ secrets.VM_USERNAME }}
         password: ${{ secrets.VM_PASSWORD }}
         script: |
-          rm -rf /home/azureuser/event_planner/*
-          mkdir -p /home/azureuser/event_planner
+          sudo rm -rf /home/azureuser/event_planner
+          sudo mkdir -p /home/azureuser/event_planner
+          sudo chown -R $USER:$USER /home/azureuser/event_planner
 
     - name: Copy build folder to VM
       uses: appleboy/scp-action@v0.1.5
