@@ -32,7 +32,8 @@ jobs:
         script: |
           sudo rm -rf /home/azureuser/event_planner
           sudo mkdir -p /home/azureuser/event_planner
-          sudo chown -R $USER:$USER /home/azureuser/event_planner
+          sudo chown -R www-data:www-data /home/azureuser/event_planner
+          sudo chmod -R 755 /home/azureuser/event_planner
 
     - name: Copy build folder to VM
       uses: appleboy/scp-action@v0.1.5
@@ -66,6 +67,12 @@ jobs:
 
               location / {
                   try_files $uri /index.html;
+              }
+
+              location /assets/ {
+                  alias /home/azureuser/event_planner/assets/;
+                  access_log off;
+                  log_not_found off;
               }
 
               location /health {
