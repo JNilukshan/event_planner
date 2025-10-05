@@ -37,13 +37,13 @@ jobs:
 
 
     - name: Debug build folder
-      run: 
+      run: |
         echo "Listing build directories..."
         ls -al
         if [ -d "build" ]; then
-          echo "Found build/ directory"
+          echo "✅ Found build/ directory"
         elif [ -d "dist" ]; then
-          echo "Found dist/ directory"
+          echo "✅ Found dist/ directory"
         else
           echo "❌ No build output found!"
           exit 1
