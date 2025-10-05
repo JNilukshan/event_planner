@@ -9,107 +9,78 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
 
-    - name: Install dependencies
-      run: npm install
+      - name: Install dependencies
+        run: npm install
 
-    - name: Build React app
-      run: npm run build
+      - name: Build Event Planner
+        run: npm run build
 
-    - name: Clean target folder on VM
-      uses: appleboy/ssh-action@v1.0.0
-      with:
-        host: ${{ secrets.VM_HOST }}
-        username: ${{ secrets.VM_USERNAME }}
-        password: ${{ secrets.VM_PASSWORD }}
-        script: |
-          sudo rm -rf /home/azureuser/event_planner
-          sudo mkdir -p /home/azureuser/event_planner
-          sudo chown -R $USER:$USER /home/azureuser/event_planner
-          sudo chmod -R 755 /home/azureuser/event_planner
+      - name: Copy dist folder to VM
+        uses: appleboy/scp-action@v0.1.5
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USERNAME }}
+          password: ${{ secrets.VM_PASSWORD }}
+          source: "dist/*"
+          target: "/home/azureuser/event_planner/"
+          strip_components: 1
 
-    - name: Debug build folder
-      run: |
-        echo "Listing build directories..."
-        ls -al
-        if [ -d "build" ]; then
-          echo "✅ Found build/ directory"
-        elif [ -d "dist" ]; then
-          echo "✅ Found dist/ directory"
-        else
-          echo "❌ No build output found!"
-          exit 1
-        fi
+      - name: Set ownership and permissions
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USERNAME }}
+          password: ${{ secrets.VM_PASSWORD }}
+          script: |
+            sudo chown -R www-data:www-data /home/azureuser/event_planner
+            sudo chmod -R 755 /home/azureuser/event_planner
+            sudo chmod +x /home/azureuser
 
-    - name: Copy build folder to VM
-      uses: appleboy/scp-action@v0.1.5
-      with:
-        host: ${{ secrets.VM_HOST }}
-        username: ${{ secrets.VM_USERNAME }}
-        password: ${{ secrets.VM_PASSWORD }}
-        source: "dist/*,build/*"
-        target: "/home/azureuser/event_planner/"
-        strip_components: 1
+      - name: Configure Nginx and restart
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USERNAME }}
+          password: ${{ secrets.VM_PASSWORD }}
+          script: |
+            sudo tee /etc/nginx/sites-available/event-planner > /dev/null << 'EOF'
+            server {
+                listen 3000;
+                server_name _;
 
-    - name: Set ownership for Nginx
-      uses: appleboy/ssh-action@v1.0.0
-      with:
-        host: ${{ secrets.VM_HOST }}
-        username: ${{ secrets.VM_USERNAME }}
-        password: ${{ secrets.VM_PASSWORD }}
-        script: |
-          # Give Nginx permission to access files
-          sudo chown -R www-data:www-data /home/azureuser/event_planner
-          sudo chmod -R 755 /home/azureuser/event_planner
-          # Allow Nginx to traverse home directory
-          sudo chmod +x /home/azureuser
+                root /home/azureuser/event_planner;
+                index index.html;
 
-    - name: Configure Nginx and restart
-      uses: appleboy/ssh-action@v1.0.0
-      with:
-        host: ${{ secrets.VM_HOST }}
-        username: ${{ secrets.VM_USERNAME }}
-        password: ${{ secrets.VM_PASSWORD }}
-        script: |
-          # Create Nginx config for port 3000
-          sudo tee /etc/nginx/sites-available/event-planner > /dev/null << 'EOF'
-          server {
-              listen 3000;
-              server_name _;
+                location / {
+                    try_files $uri /index.html;
+                }
 
-              root /home/azureuser/event_planner;
-              index index.html;
+                location /assets/ {
+                    root /home/azureuser/event_planner;
+                    access_log off;
+                    log_not_found off;
+                }
 
-              location / {
-                  try_files $uri /index.html;
-              }
+                location /health {
+                    return 200 "Event Planner OK";
+                    add_header Content-Type text/plain;
+                }
 
-              location /assets/ {
-                  root /home/azureuser/event_planner;
-                  access_log off;
-                  log_not_found off;
-              }
+                error_log /var/log/nginx/event-planner-error.log;
+                access_log /var/log/nginx/event-planner-access.log;
+            }
+            EOF
 
-              location /health {
-                  return 200 "Event Planner OK";
-                  add_header Content-Type text/plain;
-              }
+            sudo ln -sf /etc/nginx/sites-available/event-planner /etc/nginx/sites-enabled/
+            sudo nginx -t
+            sudo systemctl reload nginx
 
-              error_log /var/log/nginx/event-planner-error.log;
-              access_log /var/log/nginx/event-planner-access.log;
-          }
-          EOF
-
-          # Enable site and restart Nginx
-          sudo ln -sf /etc/nginx/sites-available/event-planner /etc/nginx/sites-enabled/
-          sudo nginx -t
-          sudo systemctl restart nginx
-
-          echo "✅ Deployment complete! Check http://$(curl -s ifconfig.me):3000/"
+            echo "✅ Event Planner deployed on http://$(curl -s ifconfig.me):3000/"
