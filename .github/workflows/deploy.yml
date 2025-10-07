@@ -27,14 +27,16 @@ jobs:
       - name: Build Event Planner
         run: npm run build
 
-      # 5️⃣ Remove old files on VM
-      - name: Clean target folder on VM
+      # 5️⃣ Ensure ownership and clean target folder
+      - name: Prepare target folder on VM
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USERNAME }}
           password: ${{ secrets.VM_PASSWORD }}
           script: |
+            sudo chown -R $USER:$USER /home/azureuser/event_planner
+            sudo chmod -R 755 /home/azureuser/event_planner
             rm -rf /home/azureuser/event_planner/*
             mkdir -p /home/azureuser/event_planner
 
@@ -48,9 +50,9 @@ jobs:
           source: "dist/*"
           target: "/home/azureuser/event_planner/"
           strip_components: 1
-          overwrite: true   # allow overwriting files
+          overwrite: true
 
-      # 7️⃣ Set ownership and permissions
+      # 7️⃣ Set ownership and permissions for Nginx
       - name: Set ownership and permissions
         uses: appleboy/ssh-action@v1.0.0
         with:
