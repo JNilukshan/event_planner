@@ -2,7 +2,11 @@ import React from 'react';
 import { Calendar, Users, QrCode, BarChart3, ArrowRight } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 
-const Hero: React.FC = () => {
+interface HeroProps {
+  onSignupClick: () => void;
+}
+
+const Hero: React.FC<HeroProps> = ({ onSignupClick }) => {
   const { isDark } = useTheme();
   
   const features = [
@@ -56,7 +60,10 @@ const Hero: React.FC = () => {
 
         {/* CTA Buttons */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16">
-          <button className="group px-8 py-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full hover:from-purple-600 hover:to-pink-600 transition-all duration-200 transform hover:scale-105 font-semibold text-lg flex items-center space-x-2">
+          <button 
+            onClick={onSignupClick}
+            className="group px-8 py-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full hover:from-purple-600 hover:to-pink-600 transition-all duration-200 transform hover:scale-105 font-semibold text-lg flex items-center space-x-2"
+          >
             <span>Start Planning Now</span>
             <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform duration-200" />
           </button>

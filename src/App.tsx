@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -8,10 +8,15 @@ import About from './components/About';
 import Footer from './components/Footer';
 import Dashboard from './components/Dashboard/Dashboard';
 import RSVPForm from './components/RSVPForm';
+import SignupModal from './components/SignupModal';
 import { useTheme } from './contexts/ThemeContext';
 
 const LandingPage: React.FC = () => {
   const { isDark } = useTheme();
+  const [isSignupOpen, setIsSignupOpen] = useState(false);
+
+  const openSignupModal = () => setIsSignupOpen(true);
+  const closeSignupModal = () => setIsSignupOpen(false);
   
   return (
     <div className={`
@@ -39,11 +44,14 @@ const LandingPage: React.FC = () => {
       
       {/* Content */}
       <div className="relative z-10">
-        <Navbar />
-        <Hero />
+        <Navbar onSignupClick={openSignupModal} />
+        <Hero onSignupClick={openSignupModal} />
         <About />
         <Footer />
       </div>
+      
+      {/* Signup Modal */}
+      <SignupModal isOpen={isSignupOpen} onClose={closeSignupModal} />
     </div>
   );
 };

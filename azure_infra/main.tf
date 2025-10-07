@@ -5,17 +5,13 @@ provider "azurerm" {
   tenant_id       = var.tenant_id
 }
 
-# -------------------------------
 # Resource Group
-# -------------------------------
 resource "azurerm_resource_group" "rg" {
   name     = var.resource_group_name
   location = var.location
 }
 
-# -------------------------------
 # Networking
-# -------------------------------
 resource "azurerm_virtual_network" "vnet" {
   name                = "${var.project_name}-vnet"
   address_space       = ["10.0.0.0/16"]
@@ -30,9 +26,7 @@ resource "azurerm_subnet" "subnet" {
   address_prefixes     = ["10.0.1.0/24"]
 }
 
-# -------------------------------
 # Network Security Group and Rules
-# -------------------------------
 resource "azurerm_network_security_group" "nsg" {
   name                = "${var.project_name}-nsg"
   location            = azurerm_resource_group.rg.location
@@ -123,9 +117,7 @@ resource "azurerm_subnet_network_security_group_association" "nsg_association" {
   network_security_group_id = azurerm_network_security_group.nsg.id
 }
 
-# -------------------------------
 # Public IP
-# -------------------------------
 resource "azurerm_public_ip" "public_ip" {
   name                = "${var.project_name}-ip"
   resource_group_name = azurerm_resource_group.rg.name
@@ -133,9 +125,7 @@ resource "azurerm_public_ip" "public_ip" {
   allocation_method   = "Static"
 }
 
-# -------------------------------
 # Network Interface
-# -------------------------------
 resource "azurerm_network_interface" "nic" {
   name                = "${var.project_name}-nic"
   location            = azurerm_resource_group.rg.location
@@ -149,9 +139,7 @@ resource "azurerm_network_interface" "nic" {
   }
 }
 
-# -------------------------------
 # Linux Virtual Machine
-# -------------------------------
 resource "azurerm_linux_virtual_machine" "vm" {
   name                  = "${var.project_name}-vm"
   resource_group_name   = azurerm_resource_group.rg.name
